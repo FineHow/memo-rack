@@ -1,0 +1,26 @@
+node_modules/
+.next/
+/next-env.d.ts
+coverage/
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+prisma/*.db
+prisma/*.db-journal
+test-results/
+playwright-report/
+out/
+desktop/dist/
+desktop/dist-before-*/
+desktop/test-data/
+releases/
+/outputs/
+/screenshots/
+
+# Local editor caches and file manager metadata
+/.vs/
+Thumbs.db
+Desktop.ini
+.DS_Store

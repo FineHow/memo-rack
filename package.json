@@ -1,0 +1,38 @@
+{
+  "name": "clothesline-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "desktop:build": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1",
+    "desktop:package": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File desktop/package.ps1",
+    "desktop:start": "powershell.exe -NoProfile -Command \"Start-Process -FilePath desktop/dist/Clothesline.exe -WindowStyle Hidden\"",
+    "desktop:test": "node scripts/test-native.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "lucide-react": "0.468.0",
+    "next": "16.3.5",
+    "onnxruntime-web": "^1.24.3",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.2.0",
+    "@tailwindcss/postcss": "4.1.12",
+    "@types/node": "22.10.2",
+    "@types/react": "19.0.3",
+    "@types/react-dom": "19.0.2",
+    "eslint": "9.39.1",
+    "eslint-config-next": "16.3.5",
+    "postcss": "8.4.49",
+    "prettier": "^3.6.2",
+    "tailwindcss": "4.1.12",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8"
+  }
+}
