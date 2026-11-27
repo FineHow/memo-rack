@@ -13,6 +13,12 @@ import { dispatchLaundry, useClock, useLaundry } from "@/lib/laundry-store";
 import { DollArt } from "./doll-art";
 import { createPortal } from "react-dom";
 import {
+  desktopBridge,
+  isDesktopWidget,
+  type OverlayFrame,
+} from "@/lib/desktop-bridge";
+import { useDesktopStatus } from "@/lib/use-desktop-status";
+import {
   isQuiet,
   nextReminder,
   reminderPhase,
@@ -96,19 +102,49 @@ export function CompanionRack({
     { state } = useLaundry(),
     now = useClock();
   const pref = preferences || companions.state;
+  const hostStatus = useDesktopStatus();
   const membersById = useMemo(
     () => new Map(pref.members.map((m) => [m.id, m])),
     [pref.members],
   );
-  const [cue, setCue] = useState<Cue | null>(null),
+  const [localCue, setCue] = useState<Cue | null>(null),
     [message, setMessage] = useState(""),
     [point, setPoint] = useState({ x: 60, y: 150 });
-  const [chat, setChat] = useState<{
+  const [localChat, setChat] = useState<{
     id: string;
     text: string;
     done?: boolean;
     until: number;
   } | null>(null);
+  const host = !!desktopBridge() && !previewOnly;
+  const cue: Cue | null = useMemo(
+    () =>
+      host
+        ? hostStatus?.cue
+          ? {
+              ...hostStatus.cue,
+              choice: 0,
+              until: Infinity,
+              preview: false,
+              pursuit: false,
+            }
+          : null
+        : localCue,
+    [host, hostStatus, localCue],
+  );
+  const chat = useMemo(
+    () =>
+      host
+        ? hostStatus?.chat
+          ? {
+              id: hostStatus.chat.memberId,
+              text: hostStatus.chat.text,
+              until: Infinity,
+            }
+          : null
+        : localChat,
+    [host, hostStatus, localChat],
+  );
   const nextChat = useRef(0);
   useEffect(() => {
     nextChat.current = 0;
@@ -168,6 +204,7 @@ export function CompanionRack({
   useEffect(() => {
     const tick = setTimeout(() => {
       if (!now) return;
+      if (desktopBridge() && !previewOnly) return;
       if (cue) {
         if (
           !cue.preview &&
@@ -354,19 +391,22 @@ export function CompanionRack({
         ? now + 300000
         : now - 60000
       : task?.dueAt || now;
-  const line = doneChat
-    ? doneChat.text
-    : cue && member
-      ? companionLine(
-          member,
-          cue.phase,
-          { title: speechTask, dueAt: due },
-          now,
-          cue.choice,
-        )
-      : chat && chat.until > now
-        ? chat.text
-        : "";
+  const line =
+    desktopBridge() && !previewOnly && hostStatus?.cue
+      ? hostStatus.cue.text
+      : doneChat
+        ? doneChat.text
+        : cue && member
+          ? companionLine(
+              member,
+              cue.phase,
+              { title: speechTask, dueAt: due },
+              now,
+              cue.choice,
+            )
+          : chat && chat.until > now
+            ? chat.text
+            : "";
   const speech = line && (
     <div className="friend-bubble" role="status">
       {line}
@@ -453,7 +493,10 @@ export function CompanionRack({
                   (pref.allMembers || cue.memberId === m.id)
                 }
                 motion={pref.motion}
-                faded={chase && member?.id === m.id}
+                faded={
+                  (chase || (isDesktopWidget() && !!hostStatus?.cue?.chase)) &&
+                  member?.id === m.id
+                }
                 onSelect={() => {
                   onMember?.(m.id);
                   speak(m);
@@ -535,6 +578,9 @@ const resting: RigPose = {
   flying: false,
 };
 const gravity = 620;
+let desktopBounds:
+  | { x: number; y: number; width: number; height: number }
+  | undefined;
 function trajectory(home: DOMRect, x: number, y: number) {
   const distance = Math.hypot(x, y);
   const direction = { x: -x / (distance || 1), y: -y / (distance || 1) };
@@ -544,12 +590,22 @@ function trajectory(home: DOMRect, x: number, y: number) {
   const tx =
     Math.abs(direction.x) < 0.0001
       ? Infinity
-      : ((direction.x > 0 ? window.innerWidth + margin : -margin) - cx) /
+      : ((direction.x > 0
+          ? (desktopBounds?.width ?? window.innerWidth) +
+            margin -
+            (desktopBounds?.x ?? 0)
+          : -(desktopBounds?.x ?? 0) - margin) -
+          cx) /
         direction.x;
   const ty =
     Math.abs(direction.y) < 0.0001
       ? Infinity
-      : ((direction.y > 0 ? window.innerHeight + margin : -margin) - cy) /
+      : ((direction.y > 0
+          ? (desktopBounds?.height ?? window.innerHeight) +
+            margin -
+            (desktopBounds?.y ?? 0)
+          : -(desktopBounds?.y ?? 0) - margin) -
+          cy) /
         direction.y;
   const travel = Math.max(180, Math.min(tx, ty));
   const duration = Math.max(
@@ -585,6 +641,14 @@ function HangingFriend({
   onShift?: (delta: number) => void;
 }) {
   const slingEnabled = relief === "sling" || relief === "both";
+  useEffect(() => {
+    if (isDesktopWidget())
+      void desktopBridge()
+        ?.geometry()
+        .then((b) => {
+          desktopBounds = b.desktop;
+        });
+  }, []);
   const slapEnabled = relief === "slap" || relief === "both";
   const rig = useRef<HTMLDivElement>(null);
   const [pose, setPose] = useState<RigPose>(resting);
@@ -607,14 +671,24 @@ function HangingFriend({
   const style = cast.find((s) => s.id === member.template) || cast[0];
   const photoW = Math.min(1, ratio),
     photoH = Math.min(1, 1 / ratio);
-  const pins =
-    member.mode === "doll" && member.template !== "uploaded"
-      ? style.pins
-      : [
-          0.5 - 0.23 * photoW,
-          0.5 + 0.23 * photoW,
-          1 - photoH + Math.min(0.025, member.edit.anchor * photoH),
-        ];
+  const pins = useMemo(
+    () =>
+      member.mode === "doll" && member.template !== "uploaded"
+        ? style.pins
+        : [
+            0.5 - 0.23 * photoW,
+            0.5 + 0.23 * photoW,
+            1 - photoH + Math.min(0.025, member.edit.anchor * photoH),
+          ],
+    [
+      member.mode,
+      member.template,
+      member.edit.anchor,
+      style.pins,
+      photoW,
+      photoH,
+    ],
+  );
   const pinY = pins[2] * artSize;
   const length = artTop + pinY - hookEnd;
 
@@ -772,6 +846,12 @@ function HangingFriend({
     frame.current = requestAnimationFrame(step);
   }
   function startPull(e: React.PointerEvent<Element>) {
+    if (isDesktopWidget())
+      void desktopBridge()
+        ?.geometry()
+        .then((b) => {
+          desktopBounds = b.desktop;
+        });
     if (!e.isPrimary || e.button !== 0 || faded) return;
     cancelAnimationFrame(frame.current);
     busy.current = true;
@@ -868,6 +948,35 @@ function HangingFriend({
     overlay && pose.held && slingEnabled && Math.hypot(pose.x, pose.y) >= 45
       ? trajectory(overlay, pose.x, pose.y)
       : null;
+  const ownsOverlay = useRef(false);
+  useEffect(() => {
+    if (!isDesktopWidget()) return;
+    if (overlay) {
+      ownsOverlay.current = true;
+      desktopBridge()?.overlay({
+        kind: "buddy",
+        member,
+        pose,
+        pins,
+        aim,
+        home: {
+          x: overlay.left,
+          y: overlay.top,
+          width: overlay.width,
+          height: overlay.height,
+        },
+      });
+    } else if (ownsOverlay.current) {
+      ownsOverlay.current = false;
+      desktopBridge()?.overlay(null);
+    }
+  }, [overlay, member, pose, pins, aim]);
+  useEffect(
+    () => () => {
+      if (ownsOverlay.current) desktopBridge()?.overlay(null);
+    },
+    [],
+  );
   return (
     <div
       ref={rig}
@@ -925,68 +1034,122 @@ function HangingFriend({
         />
       )}
       {overlay &&
+        !isDesktopWidget() &&
         createPortal(
-          <div
-            className="rig-overlay"
-            style={{ left: overlay.left, top: overlay.top }}
-          >
-            <svg viewBox="0 0 160 256" aria-hidden="true">
-              {cords(true)}
-              {aim &&
-                slingEnabled &&
-                !reduced &&
-                Math.hypot(pose.x, pose.y) >= 45 &&
-                [0, 1, 2, 3, 4].map((i) => {
-                  const t = 0.065 + i * 0.044;
-                  return (
-                    <circle
-                      key={i}
-                      cx={80 + pose.x + aim.shotX * t}
-                      cy={
-                        artTop +
-                        80 +
-                        pose.y +
-                        aim.shotY * t +
-                        (gravity * t * t) / 2
-                      }
-                      r={3.5 - i * 0.33}
-                      fill="white"
-                      stroke="#487873"
-                      opacity={1 - i * 0.12}
-                    />
-                  );
-                })}
-              {pose.flying && (
-                <g
-                  transform={`translate(${80 + pose.x} ${artTop + 80 + pose.y}) rotate(${pose.heading})`}
-                >
-                  {[-1, 0, 1].map((i) => (
-                    <line
-                      key={i}
-                      x1={-71}
-                      y1={i * 14}
-                      x2={i === 0 ? -112 : -99}
-                      y2={i * 14}
-                      stroke={i === 0 ? "#ffaa45" : "#49958e"}
-                      strokeWidth={3}
-                      strokeLinecap="round"
-                    />
-                  ))}
-                </g>
-              )}
-            </svg>
-            <div
-              className={
-                "rig-art" +
-                (pose.flying ? " soaring" : pose.slap ? " smacked" : "")
-              }
-              style={artStyle}
-            >
-              <MemberArt member={member} />
-            </div>
-          </div>,
+          <RigDrawing
+            member={member}
+            pose={pose}
+            pins={pins}
+            home={{
+              x: overlay.left,
+              y: overlay.top,
+              width: overlay.width,
+              height: overlay.height,
+            }}
+            aim={aim}
+            reduced={reduced}
+          />,
           document.body,
         )}
+    </div>
+  );
+}
+
+export function RigDrawing({
+  member,
+  pose,
+  pins,
+  home,
+  aim,
+  reduced = false,
+}: {
+  member: Companion;
+  pose: NonNullable<OverlayFrame["pose"]>;
+  pins: number[];
+  home: OverlayFrame["home"];
+  aim?: OverlayFrame["aim"];
+  reduced?: boolean;
+}) {
+  const overlay = { left: home.x, top: home.y };
+  const slingEnabled = true;
+  const pinY = pins[2] * artSize;
+  const rad = (pose.angle * Math.PI) / 180;
+  const artStyle = {
+    top: artTop,
+    transform: `translate(${pose.x}px,${pose.y}px) rotate(${pose.angle}deg) scaleX(${pose.flip ? -1 : 1})`,
+    transformOrigin: `50% ${pinY}px`,
+  };
+  const cords = () =>
+    pins.slice(0, 2).map((pin, i) => {
+      if (pose.detached) return null;
+      const px = artSize * pin,
+        delta = px - 80;
+      return (
+        <line
+          key={i}
+          x1={px}
+          y1={hookEnd}
+          x2={80 + pose.x + delta * Math.cos(rad)}
+          y2={artTop + pinY + pose.y + delta * Math.sin(rad)}
+          stroke="#838b92"
+          strokeWidth="1.6"
+        />
+      );
+    });
+  return (
+    <div
+      className="rig-overlay"
+      style={{ left: overlay.left, top: overlay.top }}
+    >
+      <svg viewBox="0 0 160 256" aria-hidden="true">
+        {cords()}
+        {aim &&
+          slingEnabled &&
+          !reduced &&
+          Math.hypot(pose.x, pose.y) >= 45 &&
+          [0, 1, 2, 3, 4].map((i) => {
+            const t = 0.065 + i * 0.044;
+            return (
+              <circle
+                key={i}
+                cx={80 + pose.x + aim.shotX * t}
+                cy={
+                  artTop + 80 + pose.y + aim.shotY * t + (gravity * t * t) / 2
+                }
+                r={3.5 - i * 0.33}
+                fill="white"
+                stroke="#487873"
+                opacity={1 - i * 0.12}
+              />
+            );
+          })}
+        {pose.flying && (
+          <g
+            transform={`translate(${80 + pose.x} ${artTop + 80 + pose.y}) rotate(${pose.heading})`}
+          >
+            {[-1, 0, 1].map((i) => (
+              <line
+                key={i}
+                x1={-71}
+                y1={i * 14}
+                x2={i === 0 ? -112 : -99}
+                y2={i * 14}
+                stroke={i === 0 ? "#ffaa45" : "#49958e"}
+                strokeWidth={3}
+                strokeLinecap="round"
+              />
+            ))}
+          </g>
+        )}
+      </svg>
+      <div
+        className={
+          "rig-art" + (pose.flying ? " soaring" : pose.slap ? " smacked" : "")
+        }
+        style={artStyle}
+      >
+        <MemberArt member={member} />
+      </div>
     </div>
   );
 }

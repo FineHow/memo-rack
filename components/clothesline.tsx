@@ -12,6 +12,7 @@ import {
 
 import { useSystemReducedMotion } from "@/lib/use-reduced-motion";
 import { companionSettings } from "./companion-panel";
+import { desktopBridge, isDesktopWidget } from "@/lib/desktop-bridge";
 
 const statusText = {
   calm: "NEXT UP",
@@ -90,6 +91,7 @@ export function Clothesline({
   function clearSheet() {
     const d = sheetDrag.current;
     if (d) {
+      if (isDesktopWidget()) desktopBridge()?.overlay(null);
       d.flight?.cancel();
       d.copy?.remove();
       d.paper.style.removeProperty("visibility");
@@ -148,6 +150,19 @@ export function Clothesline({
       : `perspective(600px) rotateY(${Math.tanh(dx / 100) * 20}deg) rotateX(${-Math.tanh(dy / 90) * 10}deg) rotateZ(${Math.tanh(dx / 160) * 4}deg)`;
     d.copy.style.transform = `translate(${dx}px,${dy}px) ${tilt}`;
     basket.current!.dataset.ready = String(dropTarget(e.clientX, e.clientY));
+    if (isDesktopWidget())
+      desktopBridge()?.overlay({
+        kind: "memo",
+        urgentMinutes: settings.urgentMinutes,
+        task: tasks.find((t) => t.id === d.id),
+        home: {
+          x: d.box.left,
+          y: d.box.top,
+          width: d.box.width,
+          height: d.box.height,
+        },
+        transform: d.copy.style.transform,
+      });
   }
   function releaseSheet(e: React.PointerEvent) {
     const d = sheetDrag.current;
@@ -163,6 +178,20 @@ export function Clothesline({
     const reduce =
       still || matchMedia("(prefers-reduced-motion: reduce)").matches;
     const begin = d.copy.style.transform;
+    if (isDesktopWidget())
+      desktopBridge()?.overlay({
+        kind: "memo",
+        urgentMinutes: settings.urgentMinutes,
+        task: tasks.find((t) => t.id === d.id),
+        home: {
+          x: d.box.left,
+          y: d.box.top,
+          width: d.box.width,
+          height: d.box.height,
+        },
+        transform: begin,
+        flight: { targetX: x, targetY: y, thrown, reduced: reduce },
+      });
     const end = thrown
       ? `translate(${x}px,${y}px) scale(.06) rotate(${reduce ? 0 : 275}deg)`
       : "none";
@@ -392,34 +421,7 @@ export function Clothesline({
                         strokeWidth="1.4"
                       />
                     </svg>
-                    <span
-                      className="memo-paper"
-                      data-task={task.id}
-                      style={{
-                        backgroundImage: `url(/memo-pads/${task.color}.png)`,
-                      }}
-                    >
-                      <span className="memo-category">
-                        {categoryLabel(task.category)}
-                      </span>
-                      <span className="memo-reference">
-                        {"# " + task.id.slice(-6).toUpperCase()}
-                      </span>
-                      <strong>{task.title}</strong>
-                      <time>
-                        {new Date(task.dueAt).toLocaleString("zh-CN", {
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </time>
-                      <span className="memo-note">{task.note}</span>
-                      <em>{statusText[level]}</em>
-                      <span className="memo-countdown">
-                        {now ? countdown(task.dueAt, now) : ""}
-                      </span>
-                    </span>
+                    <MemoFace task={task} now={now} level={level} />
                   </span>
                 </button>
               </div>
@@ -463,6 +465,45 @@ export function CompletedStamp() {
     <span className="completed-stamp">
       <Check size={14} />
       已完成
+    </span>
+  );
+}
+
+export function MemoFace({
+  task,
+  now,
+  level = urgency(task, now),
+}: {
+  task: LaundryTask;
+  now: number;
+  level?: keyof typeof statusText;
+}) {
+  return (
+    <span
+      className="memo-paper"
+      data-task={task.id}
+      style={{
+        backgroundImage: `url(/memo-pads/${task.color}.png)`,
+      }}
+    >
+      <span className="memo-category">{categoryLabel(task.category)}</span>
+      <span className="memo-reference">
+        {"# " + task.id.slice(-6).toUpperCase()}
+      </span>
+      <strong>{task.title}</strong>
+      <time>
+        {new Date(task.dueAt).toLocaleString("zh-CN", {
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+      </time>
+      <span className="memo-note">{task.note}</span>
+      <em>{statusText[level]}</em>
+      <span className="memo-countdown">
+        {now ? countdown(task.dueAt, now) : ""}
+      </span>
     </span>
   );
 }

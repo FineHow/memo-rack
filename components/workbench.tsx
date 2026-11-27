@@ -36,10 +36,12 @@ import { TaskHistory } from "./task-history";
 import { isQuiet } from "@/lib/reminders";
 import { StudioDetails } from "./studio-details";
 import { CompanionPanel } from "./companion-panel";
+import { useDesktopStatus } from "@/lib/use-desktop-status";
 
 export function Workbench() {
   const { state, ready, error, saving } = useLaundry();
   const now = useClock();
+  const mac = useDesktopStatus() !== null;
   const quietUntil = state.settings.quietUntil ?? 0;
   const [section, setSection] = useState<"board" | "companion">("board");
   const [filter, setFilter] = useState("全部小事");
@@ -553,7 +555,9 @@ export function Workbench() {
       {dialog === "settings" && (
         <Modal title="便签设置" close={close}>
           <p className="modal-subtitle">
-            临期在挂架上提醒；真正超时后按设置短时追逐，结束后进入冷却。
+            {mac
+              ? "临期在挂架上提醒；真正超时后持续追逐，可开始处理、稍后或安静。"
+              : "临期在挂架上提醒；真正超时后按设置短时追逐，结束后进入冷却。"}
           </p>
           <label className="field">
             提前多久提醒？
@@ -643,8 +647,9 @@ export function Workbench() {
           <div className="info-note">
             <Monitor size={17} />
             <p>
-              Windows
-              版使用独立的本机待办文件。透明便签架置顶，空白区域可穿透点击，托盘可打开看板或退出。
+              {mac ? "macOS" : "Windows"}
+              版使用独立的本机待办文件。透明便签架置顶，空白区域可穿透点击，
+              {mac ? "菜单栏" : "托盘"}可打开看板或退出。
             </p>
           </div>
           <button className="button primary full-width" onClick={close}>
@@ -685,8 +690,11 @@ export function Workbench() {
             </p>
           </div>
           <p className="info-note">
-            浏览器预览只在页面打开时显示提醒。Windows
-            版在托盘运行时持续提醒；关闭程序或关机期间不提醒，重新打开后按真实时间恢复。
+            浏览器预览只在页面打开时显示提醒。
+            {mac
+              ? "macOS 版在菜单栏运行时持续提醒"
+              : "Windows 版在托盘运行时持续提醒"}
+            ；关闭程序或关机期间不提醒，重新打开后按真实时间恢复。
           </p>
           <h3 className="help-studio-title">出品详情</h3>
           <StudioDetails />

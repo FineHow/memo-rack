@@ -24,3 +24,8 @@ releases/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# macOS prototype outputs
+desktop-macos/dist/
+desktop-macos/release/
+desktop-macos/test-results/

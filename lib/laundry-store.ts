@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { storageError } from "./storage-errors";
+import { desktopBridge } from "./desktop-bridge";
 import {
   applyCommand,
   EMPTY_LAUNDRY,
@@ -13,11 +14,14 @@ import {
 const KEY = "clothesline-tasks-v2";
 const LEGACY_KEY = "clothesline-tasks-v1";
 function nativeToken() {
+  if (desktopBridge()) return "macos-ipc";
   return document.querySelector<HTMLMetaElement>(
     'meta[name="clothesline-native"]',
   )?.content;
 }
 async function nativeRequest(command?: LaundryCommand): Promise<LaundryState> {
+  const bridge = desktopBridge();
+  if (bridge) return validateState(await bridge.laundry(command));
   const response = await fetch(
     "/api/laundry",
     command
@@ -38,6 +42,8 @@ async function nativeRequest(command?: LaundryCommand): Promise<LaundryState> {
   return validateState(result);
 }
 export async function showDesktopWidget() {
+  const bridge = desktopBridge();
+  if (bridge) return bridge.widget("show");
   const token = nativeToken();
   if (!token)
     throw new Error(
@@ -73,6 +79,9 @@ async function initialize() {
     try {
       if (nativeToken()) {
         publish(await nativeRequest());
+        desktopBridge()?.onChange(() => {
+          if (!snapshot.saving) void retryLaundry().catch(() => {});
+        });
         liveBound = true;
         setInterval(() => {
           if (snapshot.saving) return;
@@ -90,7 +99,7 @@ async function initialize() {
               if (generation !== writeGeneration || snapshot.saving) return;
               publish(
                 snapshot.state,
-                "桌面便签架已断开，请重新打开 Windows 程序后刷新页面",
+                "桌面便签架已断开，请重新打开桌面程序后刷新页面",
               );
             });
         }, 2000);
