@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { storageError } from "./storage-errors";
+import { desktopBridge } from "./desktop-bridge";
 import {
   EMPTY_COMPANIONS,
   starterCompanions,
@@ -10,12 +11,15 @@ import {
 } from "./companion";
 const KEY = "memo-rack-companion-v2";
 export function nativeToken() {
+  if (desktopBridge()) return "macos-ipc";
   return typeof document === "undefined"
     ? undefined
     : document.querySelector<HTMLMetaElement>('meta[name="clothesline-native"]')
         ?.content;
 }
 export async function companionRequest(action: string, value = "") {
+  const bridge = desktopBridge();
+  if (bridge) return bridge.companion(action, value);
   const r = await fetch("/api/companion", {
     method: "POST",
     headers: {
@@ -189,6 +193,9 @@ async function initialize() {
       };
       emit();
       liveBound = true;
+      desktopBridge()?.onChange(() => {
+        if (!snapshot.saving) void retryCompanions().catch(() => {});
+      });
       if (nativeToken())
         setInterval(() => {
           const generation = writeGeneration;

@@ -15,5 +15,8 @@ export default defineConfig([
     "releases/**",
     "outputs/**",
     "public/ort/**",
+    "desktop-macos/dist/**",
+    "desktop-macos/release/**",
+    "desktop-macos/test-results/**",
   ]),
 ]);

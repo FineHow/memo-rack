@@ -12,7 +12,11 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "mac:build": "npm --prefix desktop-macos run build",
+    "mac:start": "npm --prefix desktop-macos start",
+    "mac:package": "npm --prefix desktop-macos run package",
+    "mac:test": "npm --prefix desktop-macos test"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

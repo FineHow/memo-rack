@@ -1,0 +1,185 @@
+html[data-surface],
+html[data-surface] body {
+  background: transparent !important;
+  margin: 0;
+  overflow: hidden;
+}
+html[data-surface] body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+}
+.desktop-surface {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+  padding-top: 45px;
+  user-select: none;
+}
+.desktop-toolbar {
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: 1px solid #dcdad4;
+  border-radius: 24px;
+  background: #fdfcf9;
+  box-shadow: 0 2px 7px #20222518;
+  z-index: 20;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.desktop-surface[data-toolbar-visible] .desktop-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-toolbar {
+    transition: none;
+  }
+}
+.desktop-toolbar button {
+  padding: 6px 12px;
+  border-radius: 18px;
+  height: 30px;
+  color: #202225;
+}
+.desktop-toolbar button:hover {
+  background: #e8e7e3;
+}
+.desktop-toolbar .desktop-grip {
+  cursor: move;
+  font-weight: 600;
+  touch-action: none;
+}
+.desktop-toolbar .desktop-add {
+  color: white;
+  background: #254a9a;
+}
+.desktop-surface .orbit-stage {
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  height: 330px;
+}
+.desktop-surface .orbit-actions {
+  display: none;
+}
+.desktop-surface .orbit-world {
+  justify-content: center;
+  gap: 20px;
+  padding: 5px 24px 0;
+}
+.desktop-surface .orbit-world::before {
+  top: 3px;
+  left: 16px;
+  right: 16px;
+}
+.desktop-surface .orbit-fixture {
+  flex-basis: 150px;
+  width: 150px;
+}
+.desktop-surface .orbit-scene {
+  overflow-y: hidden;
+  scrollbar-width: none;
+  min-height: 310px;
+}
+.desktop-surface .friend-row {
+  min-height: 280px;
+}
+.desktop-surface .companion-stage-heading,
+.desktop-surface .companion-feedback {
+  display: none;
+}
+.desktop-surface .companion-stage .friend-slot > .friend-bubble {
+  top: 10px;
+}
+.desktop-surface .modal-backdrop {
+  z-index: 200;
+  padding: 6px;
+  background: #20242a18;
+}
+.desktop-surface .modal {
+  max-height: calc(100vh - 12px);
+  padding: 14px 22px;
+}
+.desktop-surface .modal h2 {
+  font-size: 20px;
+}
+.desktop-surface .field {
+  margin-top: 9px;
+}
+.desktop-surface .field input,
+.desktop-surface .field select,
+.desktop-surface .field textarea {
+  margin-top: 4px;
+  padding: 6px 10px;
+}
+.desktop-surface .modal-actions {
+  margin-top: 10px;
+}
+.desktop-message {
+  position: absolute;
+  bottom: 2px;
+  left: 20px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: #fff8e7;
+  color: #6b4b2d;
+  font-size: 12px;
+}
+html[data-surface="widget"] .loose-memo {
+  opacity: 0 !important;
+}
+.desktop-follower {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  padding: 8px;
+  pointer-events: none;
+}
+.desktop-follower .friend-bubble {
+  font-size: 13px;
+  max-width: 245px;
+  margin: 0 0 12px;
+  padding: 8px 13px;
+  color: #242225;
+  border: 2px solid #272426;
+  border-radius: 20px;
+  background: white;
+  line-height: 1.45;
+  box-shadow: 2px 3px 0 #322f3033;
+}
+.desktop-follower .chase-mirror {
+  width: 194px;
+  height: 194px;
+}
+.desktop-chase-motion {
+  transform: rotate(var(--chase-lean, 0deg));
+  transform-origin: 50% 85%;
+  transition: transform 100ms linear;
+}
+.desktop-chase-step {
+  animation: desktop-chase-stride 380ms ease-in-out infinite;
+}
+@keyframes desktop-chase-stride {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(calc(-1 * var(--chase-lift, 0px)));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-chase-step {
+    animation: none;
+  }
+  .desktop-chase-motion {
+    transform: none;
+    transition: none;
+  }
+}
